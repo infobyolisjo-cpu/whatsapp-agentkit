@@ -55,11 +55,16 @@ async def health_check():
 
 @app.get("/webhook")
 async def webhook_verificacion(request: Request):
-    """Verificación GET del webhook (requerido por Meta Cloud API, no-op para otros)."""
-    resultado = await proveedor.validar_webhook(request)
-    if resultado is not None:
-        return PlainTextResponse(str(resultado))
-    return {"status": "ok"}
+    hub_mode = request.query_params.get("hub.mode")
+    hub_verify_token = request.query_params.get("hub.verify_token")
+    hub_challenge = request.query_params.get("hub.challenge")
+
+    VERIFY_TOKEN = "olis123"
+
+    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
+        return PlainTextResponse(content=hub_challenge)
+
+    return PlainTextResponse(content="Error de verificación", status_code=403)
 
 
 @app.post("/webhook")
