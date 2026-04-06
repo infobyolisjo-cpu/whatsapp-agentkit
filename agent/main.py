@@ -53,7 +53,7 @@ async def health_check():
     return {"status": "ok", "agente": "OlisJo AI", "negocio": "ByOlisJo AI Assistant"}
 
 
-@@app.api_route("/", methods=["GET", "HEAD"])
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root_verificacion(request: Request):
     hub_mode = request.query_params.get("hub.mode")
     hub_verify_token = request.query_params.get("hub.verify_token")
