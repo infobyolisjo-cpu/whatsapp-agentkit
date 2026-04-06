@@ -53,7 +53,7 @@ async def health_check():
     return {"status": "ok", "agente": "OlisJo AI", "negocio": "ByOlisJo AI Assistant"}
 
 
-@app.get("/webhook")
+@app.api_route("/webhook", methods=["GET", "HEAD"])
 async def webhook_verificacion(request: Request):
     hub_mode = request.query_params.get("hub.mode")
     hub_verify_token = request.query_params.get("hub.verify_token")
