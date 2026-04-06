@@ -62,9 +62,9 @@ async def webhook_verificacion(request: Request):
     VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
-        return PlainTextResponse(content=str(hub_challenge))
+        return PlainTextResponse(content=str(hub_challenge), status_code=200)
 
-    return PlainTextResponse(content="Error")
+    return PlainTextResponse(content="ok", status_code=200)
 
 
 @app.post("/webhook")
