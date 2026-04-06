@@ -47,12 +47,6 @@ app = FastAPI(
 )
 
 
-@app.get("/")
-async def health_check():
-    """Endpoint de salud para Railway/monitoreo."""
-    return {"status": "ok", "agente": "OlisJo AI", "negocio": "ByOlisJo AI Assistant"}
-
-
 @app.api_route("/webhook", methods=["GET", "HEAD"])
 async def webhook_verificacion(request: Request):
     hub_mode = request.query_params.get("hub.mode")
