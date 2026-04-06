@@ -59,7 +59,7 @@ async def webhook_verificacion(request: Request):
     hub_verify_token = request.query_params.get("hub.verify_token")
     hub_challenge = request.query_params.get("hub.challenge")
 
-    VERIFY_TOKEN = "olis123"
+    VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
         return PlainTextResponse(content=hub_challenge)
