@@ -58,8 +58,7 @@ async def root_verificacion(request: Request):
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
         return PlainTextResponse(content=str(hub_challenge))
 
-    return PlainTextResponse(content="Error", status_code=403)
-
+    return PlainTextResponse(content="ok", status_code=200)
 
 @app.api_route("/webhook", methods=["GET", "HEAD"])
 async def webhook_verificacion(request: Request):
@@ -72,7 +71,7 @@ async def webhook_verificacion(request: Request):
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
         return PlainTextResponse(content=str(hub_challenge))
 
-    return PlainTextResponse(content="Error", status_code=403)
+   return PlainTextResponse(content="ok", status_code=200)
 
 
 @app.post("/webhook")
