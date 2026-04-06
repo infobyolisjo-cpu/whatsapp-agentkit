@@ -53,8 +53,8 @@ async def health_check():
     return {"status": "ok", "agente": "OlisJo AI", "negocio": "ByOlisJo AI Assistant"}
 
 
-@app.api_route("/", methods=["GET", "HEAD"])
-async def root_verificacion(request: Request):
+@app.api_route("/webhook", methods=["GET", "HEAD"])
+async def webhook_verificacion(request: Request):
     hub_mode = request.query_params.get("hub.mode")
     hub_verify_token = request.query_params.get("hub.verify_token")
     hub_challenge = request.query_params.get("hub.challenge")
@@ -62,10 +62,9 @@ async def root_verificacion(request: Request):
     VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
-        return PlainTextResponse(content=str(hub_challenge), status_code=200)
+        return PlainTextResponse(content=str(hub_challenge))
 
-    return {"status": "ok"}
-
+    return PlainTextResponse(content="ok")
 
 @app.post("/webhook")
 async def webhook_handler(request: Request):
