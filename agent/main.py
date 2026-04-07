@@ -47,8 +47,8 @@ app = FastAPI(
 )
 
 
-@app.api_route("/", methods=["GET", "HEAD"])
-async def root_verificacion(request: Request):
+@app.api_route("/webhook", methods=["GET", "HEAD"])
+async def webhook_verificacion(request: Request):
     hub_mode = request.query_params.get("hub.mode")
     hub_verify_token = request.query_params.get("hub.verify_token")
     hub_challenge = request.query_params.get("hub.challenge")
