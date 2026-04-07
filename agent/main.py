@@ -9,6 +9,7 @@ Funciona con cualquier proveedor (Whapi, Meta, Twilio) gracias a la capa de prov
 import os
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
@@ -47,18 +48,10 @@ app = FastAPI(
 )
 
 
-@app.api_route("/webhook", methods=["GET", "HEAD"])
-async def webhook_verificacion(request: Request):
-    hub_mode = request.query_params.get("hub.mode")
-    hub_verify_token = request.query_params.get("hub.verify_token")
-    hub_challenge = request.query_params.get("hub.challenge")
+@app.get("/")
+async def health_check():
+    return {"status": "ok"}
 
-    VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
-
-    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
-        return PlainTextResponse(content=str(hub_challenge))
-
-    return PlainTextResponse(content="ok", status_code=200)
 
 @app.api_route("/webhook", methods=["GET", "HEAD"])
 async def webhook_verificacion(request: Request):
@@ -66,12 +59,12 @@ async def webhook_verificacion(request: Request):
     hub_verify_token = request.query_params.get("hub.verify_token")
     hub_challenge = request.query_params.get("hub.challenge")
 
-    VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
+    verify_token = os.getenv("VERIFY_TOKEN")
 
-    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
+    if hub_mode == "subscribe" and hub_verify_token == verify_token:
         return PlainTextResponse(content=str(hub_challenge))
 
-    return PlainTextResponse(content="ok", status_code=200)
+    return PlainTextResponse(content="Error", status_code=403)
 
 
 @app.post("/webhook")
