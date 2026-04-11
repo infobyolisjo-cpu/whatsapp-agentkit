@@ -118,8 +118,16 @@ async def ver_inbox():
         .chat { max-width: 500px; margin: auto; }
         .msg { padding: 10px; margin: 8px; border-radius: 10px; max-width: 80%; }
         .user { background: #dcf8c6; margin-left: auto; text-align: right; }
-        .bot { background: white; margin-right: auto; }
-        .phone { font-size: 12px; color: gray; }
+        .bot {
+    background: white;
+    margin-right: auto;
+}
+        .phone {
+    font-size: 12px;
+    color: #888;
+    text-align: right;
+    margin-top: 3px;
+}
     </style>
     </head>
     <body>
