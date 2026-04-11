@@ -48,3 +48,4 @@ Thumbs.db
 
 # Node (si se usa para Claude Code)
 node_modules/
+claude-webkit/
