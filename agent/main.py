@@ -114,47 +114,70 @@ async def ver_inbox():
     <html>
     <head>
     <style>
-        body { font-family: Arial; background: #ece5dd; padding: 20px; }
-        .chat { max-width: 500px; margin: auto; }
-        .msg { padding: 10px; margin: 8px; border-radius: 10px; max-width: 80%; }
-        .user { background: #dcf8c6; margin-left: auto; text-align: right; }
-        .bot {
-    background: white;
-    margin-right: auto;
-}
-        .phone {
-    font-size: 12px;
-    color: #888;
-    text-align: right;
-    margin-top: 3px;
-}
+        body {
+            font-family: Arial;
+            background: white;
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background: #f4f4f4;
+            text-align: left;
+            padding: 10px;
+            font-size: 14px;
+        }
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            font-size: 14px;
+        }
+        .user { color: #000; }
+        .bot { color: #555; }
     </style>
     </head>
     <body>
-    <div class="chat">
-    <h2>💬 Inbox ByOlisJo</h2>
+
+    <h2>📊 Inbox ByOlisJo</h2>
+
+    <table>
+        <tr>
+            <th>Número</th>
+            <th>Tipo</th>
+            <th>Mensaje</th>
+        </tr>
     """
 
     try:
         conn = sqlite3.connect("agentkit.db")
         cursor = conn.cursor()
 
-        cursor.execute("SELECT telefono, role, content FROM mensajes ORDER BY id ASC LIMIT 100")
+        cursor.execute(
+            "SELECT telefono, role, content FROM mensajes ORDER BY id DESC LIMIT 100"
+        )
         rows = cursor.fetchall()
         conn.close()
 
         if not rows:
-            html += "<p>No hay conversaciones aún</p>"
+            html += "<tr><td colspan='3'>No hay conversaciones aún</td></tr>"
         else:
             for telefono, role, content in rows:
-                if role == "user":
-                    html += f'<div class="msg user">{content}<div class="phone">{telefono}</div></div>'
-                else:
-                    html += f'<div class="msg bot">{content}<div class="phone">{telefono}</div></div>'
+                clase = "user" if role == "user" else "bot"
+                tipo = "Cliente" if role == "user" else "Bot"
+
+                html += f"""
+                <tr>
+                    <td>{telefono}</td>
+                    <td>{tipo}</td>
+                    <td class="{clase}">{content}</td>
+                </tr>
+                """
 
     except Exception as e:
-        html += f"<p>Error: {str(e)}</p>"
+        html += f"<tr><td colspan='3'>Error: {str(e)}</td></tr>"
 
-    html += "</div></body></html>"
+    html += "</table></body></html>"
 
     return html
