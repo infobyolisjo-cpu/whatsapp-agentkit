@@ -105,7 +105,7 @@ async def webhook_handler(request: Request):
         logger.error(f"Error en webhook: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-from fastapi.responses import PlainTextResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 import sqlite3
 
 @app.get("/inbox", response_class=HTMLResponse)
