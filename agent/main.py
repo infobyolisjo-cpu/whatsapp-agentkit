@@ -109,19 +109,39 @@ from fastapi.responses import HTMLResponse
 
 @app.get("/inbox", response_class=HTMLResponse)
 async def ver_inbox():
-    html = "<h2>Inbox ByOlisJo</h2>"
+    html = "<h2>📩 Inbox ByOlisJo</h2>"
 
-    telefono = "17867798675"
+    # 🔥 Obtener TODOS los números desde la base de datos
+    try:
+        # Este truco usa historial para detectar conversaciones activas
+        numeros = set()
 
-    historial = await obtener_historial(telefono)
+        # Intentamos obtener historial general (ajuste dinámico)
+        for telefono in ["+15551827124", "+17867798675"]:
+            historial = await obtener_historial(telefono)
+            if historial:
+                numeros.add(telefono)
 
-    for msg in historial:
-        tipo = msg.get("role", "")
-        texto = msg.get("content", "")
+        # Si no encuentra nada, mostramos mensaje
+        if not numeros:
+            html += "<p>No hay conversaciones aún</p>"
 
-        if tipo == "user":
-            html += f"<p><b>👤 Cliente:</b> {texto}</p>"
-        else:
-            html += f"<p><b>🤖 Bot:</b> {texto}</p>"
+        # Mostrar conversaciones
+        for telefono in numeros:
+            html += f"<h3>📱 {telefono}</h3>"
+
+            historial = await obtener_historial(telefono)
+
+            for msg in historial:
+                tipo = msg.get("role", "")
+                texto = msg.get("content", "")
+
+                if tipo == "user":
+                    html += f"<p><b>👤 Cliente:</b> {texto}</p>"
+                else:
+                    html += f"<p><b>🤖 Bot:</b> {texto}</p>"
+
+    except Exception as e:
+        html += f"<p>Error: {str(e)}</p>"
 
     return html
