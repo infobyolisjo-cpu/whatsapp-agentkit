@@ -22,7 +22,7 @@ knowledge/*
 !knowledge/.gitkeep
 
 # Archivos generados por Claude Code durante onboarding
-agent/
+
 config/
 tests/
 requirements.txt
