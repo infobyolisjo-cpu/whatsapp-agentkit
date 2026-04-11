@@ -104,3 +104,24 @@ async def webhook_handler(request: Request):
     except Exception as e:
         logger.error(f"Error en webhook: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+from fastapi.responses import HTMLResponse
+
+@app.get("/inbox", response_class=HTMLResponse)
+async def ver_inbox():
+    html = "<h2>Inbox ByOlisJo</h2>"
+
+    telefono = "17867798675"
+
+    historial = await obtener_historial(telefono)
+
+    for msg in historial:
+        tipo = msg["role"]
+        texto = msg["content"]
+
+        if tipo == "user":
+            html += f"<p><b>👤 Cliente:</b> {texto}</p>"
+        else:
+            html += f"<p><b>🤖 Bot:</b> {texto}</p>"
+
+    return html
