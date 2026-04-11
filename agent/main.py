@@ -110,15 +110,28 @@ import sqlite3
 
 @app.get("/inbox", response_class=HTMLResponse)
 async def ver_inbox():
-    html = "<h2>📩 Inbox ByOlisJo</h2>"
+    html = """
+    <html>
+    <head>
+    <style>
+        body { font-family: Arial; background: #ece5dd; padding: 20px; }
+        .chat { max-width: 500px; margin: auto; }
+        .msg { padding: 10px; margin: 8px; border-radius: 10px; max-width: 80%; }
+        .user { background: #dcf8c6; margin-left: auto; text-align: right; }
+        .bot { background: white; margin-right: auto; }
+        .phone { font-size: 12px; color: gray; }
+    </style>
+    </head>
+    <body>
+    <div class="chat">
+    <h2>💬 Inbox ByOlisJo</h2>
+    """
 
     try:
         conn = sqlite3.connect("agentkit.db")
         cursor = conn.cursor()
 
-        cursor.execute(
-            "SELECT telefono, role, content FROM mensajes ORDER BY id DESC LIMIT 50"
-        )
+        cursor.execute("SELECT telefono, role, content FROM mensajes ORDER BY id ASC LIMIT 100")
         rows = cursor.fetchall()
         conn.close()
 
@@ -126,16 +139,14 @@ async def ver_inbox():
             html += "<p>No hay conversaciones aún</p>"
         else:
             for telefono, role, content in rows:
-                html += f"<p><b>📱 {telefono}</b></p>"
-
                 if role == "user":
-                    html += f"<p>👤 {content}</p>"
+                    html += f'<div class="msg user">{content}<div class="phone">{telefono}</div></div>'
                 else:
-                    html += f"<p>🤖 {content}</p>"
-
-                html += "<hr>"
+                    html += f'<div class="msg bot">{content}<div class="phone">{telefono}</div></div>'
 
     except Exception as e:
         html += f"<p>Error: {str(e)}</p>"
+
+    html += "</div></body></html>"
 
     return html
