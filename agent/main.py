@@ -116,8 +116,8 @@ async def ver_inbox():
     historial = await obtener_historial(telefono)
 
     for msg in historial:
-        tipo = msg["role"]
-        texto = msg["content"]
+        tipo = msg.get("role", "")
+        texto = msg.get("content", "")
 
         if tipo == "user":
             html += f"<p><b>👤 Cliente:</b> {texto}</p>"
