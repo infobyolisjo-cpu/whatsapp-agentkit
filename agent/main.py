@@ -105,40 +105,7 @@ async def webhook_handler(request: Request):
         logger.error(f"Error en webhook: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-from fastapi.responses import HTMLResponse
-
-@app.get("/inbox", response_class=HTMLResponse)
-async def ver_inbox():
-    html = "<h2>📩 Inbox ByOlisJo</h2>"
-
-    # 🔥 Obtener TODOS los números desde la base de datos
-    try:
-        # Este truco usa historial para detectar conversaciones activas
-        numeros = set()
-
-        # Intentamos obtener historial general (ajuste dinámico)
-        for telefono in ["+15551827124", "+17867798675"]:
-            historial = await obtener_historial(telefono)
-            if historial:
-                numeros.add(telefono)
-
-        # Si no encuentra nada, mostramos mensaje
-        if not numeros:
-            html += "<p>No hay conversaciones aún</p>"
-
-        # Mostrar conversaciones
-        for telefono in numeros:
-            html += f"<h3>📱 {telefono}</h3>"
-
-            historial = await obtener_historial(telefono)
-
-            for msg in historial:
-                tipo = msg.get("role", "")
-                texto = msg.get("content", "")
-
-                if tipo == "user":
-                    html += f"<p><b>👤 Cliente:</b> {texto}</p>"
-                from fastapi.responses import HTMLResponse
+from fastapi.responses import PlainTextResponse, HTMLResponse
 import sqlite3
 
 @app.get("/inbox", response_class=HTMLResponse)
@@ -146,20 +113,19 @@ async def ver_inbox():
     html = "<h2>📩 Inbox ByOlisJo</h2>"
 
     try:
-        # 🔥 conectar a la base de datos directamente
         conn = sqlite3.connect("agentkit.db")
         cursor = conn.cursor()
 
-        # obtener TODOS los mensajes
-        cursor.execute("SELECT telefono, role, content FROM mensajes ORDER BY id DESC LIMIT 50")
+        cursor.execute(
+            "SELECT telefono, role, content FROM mensajes ORDER BY id DESC LIMIT 50"
+        )
         rows = cursor.fetchall()
+        conn.close()
 
         if not rows:
             html += "<p>No hay conversaciones aún</p>"
         else:
-            for row in rows:
-                telefono, role, content = row
-
+            for telefono, role, content in rows:
                 html += f"<p><b>📱 {telefono}</b></p>"
 
                 if role == "user":
@@ -168,8 +134,6 @@ async def ver_inbox():
                     html += f"<p>🤖 {content}</p>"
 
                 html += "<hr>"
-
-        conn.close()
 
     except Exception as e:
         html += f"<p>Error: {str(e)}</p>"
