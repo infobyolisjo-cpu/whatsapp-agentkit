@@ -138,8 +138,38 @@ async def ver_inbox():
 
                 if tipo == "user":
                     html += f"<p><b>👤 Cliente:</b> {texto}</p>"
+                from fastapi.responses import HTMLResponse
+import sqlite3
+
+@app.get("/inbox", response_class=HTMLResponse)
+async def ver_inbox():
+    html = "<h2>📩 Inbox ByOlisJo</h2>"
+
+    try:
+        # 🔥 conectar a la base de datos directamente
+        conn = sqlite3.connect("agentkit.db")
+        cursor = conn.cursor()
+
+        # obtener TODOS los mensajes
+        cursor.execute("SELECT telefono, role, content FROM mensajes ORDER BY id DESC LIMIT 50")
+        rows = cursor.fetchall()
+
+        if not rows:
+            html += "<p>No hay conversaciones aún</p>"
+        else:
+            for row in rows:
+                telefono, role, content = row
+
+                html += f"<p><b>📱 {telefono}</b></p>"
+
+                if role == "user":
+                    html += f"<p>👤 {content}</p>"
                 else:
-                    html += f"<p><b>🤖 Bot:</b> {texto}</p>"
+                    html += f"<p>🤖 {content}</p>"
+
+                html += "<hr>"
+
+        conn.close()
 
     except Exception as e:
         html += f"<p>Error: {str(e)}</p>"
