@@ -47,6 +47,31 @@ def obtener_mensaje_fallback() -> str:
     return config.get("fallback_message", "Disculpa, no entendí tu mensaje. ¿Podrías reformularlo?")
 
 
+RESPUESTA_CONTACTO = """Claro 😊 Puedes escribirnos directamente a:
+
+📩 contacto@byolisjo.com
+🌐 https://byolisjo.com
+
+En ByOlisJo ayudamos a negocios a detectar fugas financieras, problemas operativos y áreas que frenan el crecimiento.
+
+¿Tu consulta es sobre costos, procesos o ventas?"""
+
+PALABRAS_CONTACTO = [
+    "correo", "email", "e-mail", "contacto", "contactar", "comunicarme",
+    "comunicarse", "escribirles", "escribirte", "escribirnos", "número",
+    "numero", "whatsapp", "teléfono", "telefono", "celular", "cómo los contacto",
+    "como los contacto", "cómo contactarlos", "como contactarlos",
+    "cómo me comunico", "como me comunico", "información de contacto",
+    "informacion de contacto", "datos de contacto",
+]
+
+
+def es_pregunta_de_contacto(mensaje: str) -> bool:
+    """Detecta si el mensaje pide datos de contacto."""
+    texto = mensaje.lower().strip()
+    return any(palabra in texto for palabra in PALABRAS_CONTACTO)
+
+
 async def generar_respuesta(mensaje: str, historial: list[dict]) -> str:
     """
     Genera una respuesta usando Claude API.
@@ -61,6 +86,11 @@ async def generar_respuesta(mensaje: str, historial: list[dict]) -> str:
     # Si el mensaje es muy corto o vacío, usar fallback
     if not mensaje or len(mensaje.strip()) < 2:
         return obtener_mensaje_fallback()
+
+    # Interceptar preguntas de contacto — respuesta garantizada sin llamar a Claude
+    if es_pregunta_de_contacto(mensaje):
+        logger.info(f"Interceptado: pregunta de contacto — '{mensaje}'")
+        return RESPUESTA_CONTACTO
 
     system_prompt = cargar_system_prompt()
 
