@@ -7,9 +7,12 @@ Funciona con cualquier proveedor (Whapi, Meta, Twilio) gracias a la capa de prov
 """
 
 import os
+import asyncio
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
+import httpx
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
@@ -29,6 +32,63 @@ logger = logging.getLogger("agentkit")
 # Proveedor de WhatsApp (se configura en .env con WHATSAPP_PROVIDER)
 proveedor = obtener_proveedor()
 PORT = int(os.getenv("PORT", 8000))
+
+CRM_WEBHOOK_URL = os.getenv("CRM_WEBHOOK_URL", "")
+CRM_WEBHOOK_SECRET = os.getenv("CRM_WEBHOOK_SECRET", "")
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
+
+
+async def notificar_crm(telefono: str, texto: str) -> None:
+    """
+    Envía el nuevo contacto de WhatsApp al CRM (fire & forget).
+    Solo se llama en el primer mensaje — historial vacío indica contacto nuevo.
+    """
+    if not CRM_WEBHOOK_URL:
+        return
+    payload = {
+        "name": f"WhatsApp {telefono}",
+        "phone": telefono,
+        "source": "whatsapp",
+        "channel": "whatsapp",
+        "notes": texto[:500],  # limitar notas a 500 chars
+    }
+    headers = {"Content-Type": "application/json"}
+    if CRM_WEBHOOK_SECRET:
+        headers["x-webhook-secret"] = CRM_WEBHOOK_SECRET
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(CRM_WEBHOOK_URL, json=payload, headers=headers)
+            if r.status_code == 201:
+                logger.info(f"[CRM] Lead creado: {telefono}")
+            else:
+                logger.warning(f"[CRM] Respuesta inesperada {r.status_code}: {r.text[:200]}")
+    except Exception as e:
+        logger.error(f"[CRM] Error al notificar: {e}")
+
+
+async def notificar_n8n(telefono: str, texto: str) -> None:
+    """
+    Notifica a n8n cada vez que un cliente envía un mensaje.
+    Fire-and-forget: nunca interrumpe la conversación si falla.
+    """
+    if not N8N_WEBHOOK_URL:
+        return
+    payload = {
+        "phone": telefono,
+        "message": texto,
+        "name": f"WhatsApp {telefono}",
+        "source": "whatsapp_agentkit",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.post(N8N_WEBHOOK_URL, json=payload)
+            if r.status_code == 200:
+                logger.info(f"[n8n] Notificación enviada OK: {telefono}")
+            else:
+                logger.warning(f"[n8n] Respuesta inesperada {r.status_code}: {r.text[:200]}")
+    except Exception as e:
+        logger.error(f"[n8n] Error al notificar (no afecta WhatsApp): {e}")
 
 
 @asynccontextmanager
@@ -87,12 +147,19 @@ async def webhook_handler(request: Request):
             # Obtener historial ANTES de guardar el mensaje actual
             historial = await obtener_historial(msg.telefono)
 
+            # Notificar CRM si es el primer mensaje de este número (contacto nuevo)
+            if not historial:
+                asyncio.create_task(notificar_crm(msg.telefono, msg.texto))
+
             # Generar respuesta con Claude
             respuesta = await generar_respuesta(msg.texto, historial)
 
             # Guardar mensaje del usuario Y respuesta del agente en memoria
             await guardar_mensaje(msg.telefono, "user", msg.texto)
             await guardar_mensaje(msg.telefono, "assistant", respuesta)
+
+            # Notificar n8n con cada mensaje del cliente (fire & forget)
+            asyncio.create_task(notificar_n8n(msg.telefono, msg.texto))
 
             # Enviar respuesta por WhatsApp via el proveedor
             await proveedor.enviar_mensaje(msg.telefono, respuesta)
