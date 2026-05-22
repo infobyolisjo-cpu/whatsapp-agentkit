@@ -22,12 +22,13 @@ knowledge/*
 !knowledge/.gitkeep
 
 # Archivos generados por Claude Code durante onboarding
-
-config/
 tests/
 requirements.txt
 Dockerfile
 docker-compose.yml
+
+# Secreto de sesión (no el prompt)
+config/session.yaml
 
 # Session state
 config/session.yaml
