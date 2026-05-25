@@ -9,6 +9,7 @@ y genera respuestas usando la API de Anthropic Claude.
 import os
 import yaml
 import logging
+import httpx
 from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 
@@ -17,6 +18,9 @@ logger = logging.getLogger("agentkit")
 
 # Cliente de Anthropic
 client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+# URL del workflow RAG en n8n
+RAG_WEBHOOK_URL = os.getenv("RAG_WEBHOOK_URL", "")
 
 
 def cargar_config_prompts() -> dict:
@@ -72,7 +76,40 @@ def es_pregunta_de_contacto(mensaje: str) -> bool:
     return any(palabra in texto for palabra in PALABRAS_CONTACTO)
 
 
-async def generar_respuesta(mensaje: str, historial: list[dict]) -> str:
+async def consultar_rag(mensaje: str, telefono: str = "") -> str:
+    """
+    Consulta el workflow RAG de n8n y retorna el contexto relevante.
+    Si falla o no hay URL configurada, retorna string vacío (no bloquea el flujo).
+    """
+    if not RAG_WEBHOOK_URL:
+        return ""
+    try:
+        async with httpx.AsyncClient(timeout=8) as client_http:
+            r = await client_http.post(
+                RAG_WEBHOOK_URL,
+                json={"message": mensaje, "phone": telefono},
+            )
+            if r.status_code == 200:
+                data = r.json()
+                # Acepta respuesta como {"context": "..."} o {"output": "..."} o texto directo
+                if isinstance(data, dict):
+                    contexto = data.get("context") or data.get("output") or data.get("text") or data.get("response") or ""
+                elif isinstance(data, str):
+                    contexto = data
+                else:
+                    contexto = ""
+                if contexto:
+                    logger.info(f"[RAG] Contexto obtenido ({len(contexto)} chars)")
+                return contexto
+            else:
+                logger.warning(f"[RAG] Respuesta inesperada: {r.status_code}")
+                return ""
+    except Exception as e:
+        logger.warning(f"[RAG] No disponible, continuando sin contexto: {e}")
+        return ""
+
+
+async def generar_respuesta(mensaje: str, historial: list[dict], telefono: str = "") -> str:
     """
     Genera una respuesta usando Claude API.
 
@@ -93,6 +130,18 @@ async def generar_respuesta(mensaje: str, historial: list[dict]) -> str:
         return RESPUESTA_CONTACTO
 
     system_prompt = cargar_system_prompt()
+
+    # Consultar RAG en n8n para obtener contexto específico de ByOlisJo
+    contexto_rag = await consultar_rag(mensaje, telefono)
+
+    # Si el RAG devolvió contexto, inyectarlo en el system prompt
+    if contexto_rag:
+        system_prompt = (
+            system_prompt
+            + "\n\n## Contexto relevante de la base de conocimiento ByOlisJo\n"
+            + "Usa esta información para responder con más precisión:\n\n"
+            + contexto_rag
+        )
 
     # Construir mensajes para la API
     mensajes = []

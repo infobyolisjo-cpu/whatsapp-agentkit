@@ -151,8 +151,8 @@ async def webhook_handler(request: Request):
             if not historial:
                 asyncio.create_task(notificar_crm(msg.telefono, msg.texto))
 
-            # Generar respuesta con Claude
-            respuesta = await generar_respuesta(msg.texto, historial)
+            # Generar respuesta con Claude + contexto RAG de n8n
+            respuesta = await generar_respuesta(msg.texto, historial, telefono=msg.telefono)
 
             # Guardar mensaje del usuario Y respuesta del agente en memoria
             await guardar_mensaje(msg.telefono, "user", msg.texto)
