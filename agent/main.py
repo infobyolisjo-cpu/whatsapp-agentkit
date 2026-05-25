@@ -37,6 +37,27 @@ CRM_WEBHOOK_URL = os.getenv("CRM_WEBHOOK_URL", "")
 CRM_WEBHOOK_SECRET = os.getenv("CRM_WEBHOOK_SECRET", "")
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
 
+# Cache de IDs de mensajes ya procesados — evita duplicados por reintentos de Meta
+# Guarda hasta 500 IDs; los más viejos se eliminan automáticamente
+_mensajes_procesados: dict[str, float] = {}
+MAX_CACHE = 500
+
+
+def ya_procesado(mensaje_id: str) -> bool:
+    """Retorna True si este mensaje ya fue procesado."""
+    return mensaje_id in _mensajes_procesados
+
+
+def marcar_procesado(mensaje_id: str) -> None:
+    """Registra el mensaje como procesado. Limpia el cache si crece demasiado."""
+    import time
+    _mensajes_procesados[mensaje_id] = time.time()
+    if len(_mensajes_procesados) > MAX_CACHE:
+        # Eliminar el 20% más antiguo
+        ordenados = sorted(_mensajes_procesados.items(), key=lambda x: x[1])
+        for k, _ in ordenados[:MAX_CACHE // 5]:
+            del _mensajes_procesados[k]
+
 
 async def notificar_crm(telefono: str, texto: str) -> None:
     """
@@ -127,50 +148,57 @@ async def webhook_verificacion(request: Request):
     return PlainTextResponse(content="Error", status_code=403)
 
 
+async def procesar_mensaje(telefono: str, texto: str, mensaje_id: str) -> None:
+    """Procesa un mensaje en background: RAG + Claude + envío."""
+    try:
+        historial = await obtener_historial(telefono)
+
+        if not historial:
+            asyncio.create_task(notificar_crm(telefono, texto))
+
+        respuesta = await generar_respuesta(texto, historial, telefono=telefono)
+
+        await guardar_mensaje(telefono, "user", texto)
+        await guardar_mensaje(telefono, "assistant", respuesta)
+
+        asyncio.create_task(notificar_n8n(telefono, texto))
+
+        await proveedor.enviar_mensaje(telefono, respuesta)
+        logger.info(f"Respuesta enviada a {telefono}: {respuesta[:80]}")
+
+    except Exception as e:
+        logger.error(f"Error procesando mensaje {mensaje_id}: {e}")
+
+
 @app.post("/webhook")
 async def webhook_handler(request: Request):
     """
-    Recibe mensajes de WhatsApp via el proveedor configurado.
-    Procesa el mensaje, genera respuesta con Claude y la envía de vuelta.
+    Responde 200 a Meta de inmediato y procesa el mensaje en background.
+    Evita reintentos y mensajes duplicados.
     """
     try:
-        # Parsear webhook — el proveedor normaliza el formato
         mensajes = await proveedor.parsear_webhook(request)
 
         for msg in mensajes:
-            # Ignorar mensajes propios o vacíos
             if msg.es_propio or not msg.texto:
                 continue
 
+            # Ignorar si ya fue procesado (reintento de Meta)
+            if ya_procesado(msg.mensaje_id):
+                logger.info(f"Duplicado ignorado: {msg.mensaje_id}")
+                continue
+
+            marcar_procesado(msg.mensaje_id)
             logger.info(f"Mensaje de {msg.telefono}: {msg.texto}")
 
-            # Obtener historial ANTES de guardar el mensaje actual
-            historial = await obtener_historial(msg.telefono)
-
-            # Notificar CRM si es el primer mensaje de este número (contacto nuevo)
-            if not historial:
-                asyncio.create_task(notificar_crm(msg.telefono, msg.texto))
-
-            # Generar respuesta con Claude + contexto RAG de n8n
-            respuesta = await generar_respuesta(msg.texto, historial, telefono=msg.telefono)
-
-            # Guardar mensaje del usuario Y respuesta del agente en memoria
-            await guardar_mensaje(msg.telefono, "user", msg.texto)
-            await guardar_mensaje(msg.telefono, "assistant", respuesta)
-
-            # Notificar n8n con cada mensaje del cliente (fire & forget)
-            asyncio.create_task(notificar_n8n(msg.telefono, msg.texto))
-
-            # Enviar respuesta por WhatsApp via el proveedor
-            await proveedor.enviar_mensaje(msg.telefono, respuesta)
-
-            logger.info(f"Respuesta a {msg.telefono}: {respuesta}")
+            # Procesar en background — Meta recibe 200 de inmediato
+            asyncio.create_task(procesar_mensaje(msg.telefono, msg.texto, msg.mensaje_id))
 
         return {"status": "ok"}
 
     except Exception as e:
         logger.error(f"Error en webhook: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "ok"}  # Siempre 200 para que Meta no reintente
 
 from fastapi.responses import HTMLResponse
 import sqlite3
