@@ -93,7 +93,7 @@ async def consultar_rag(mensaje: str, telefono: str = "") -> str:
                 data = r.json()
                 # Acepta respuesta como {"context": "..."} o {"output": "..."} o texto directo
                 if isinstance(data, dict):
-                    contexto = data.get("context") or data.get("output") or data.get("text") or data.get("response") or ""
+                    contexto = data.get("answer") or data.get("context") or data.get("output") or data.get("text") or data.get("response") or ""
                 elif isinstance(data, str):
                     contexto = data
                 else:
