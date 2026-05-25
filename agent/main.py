@@ -102,7 +102,7 @@ async def notificar_n8n(telefono: str, texto: str) -> None:
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     try:
-        async with httpx.AsyncClient(timeout=5) as client:
+        async with httpx.AsyncClient(timeout=3) as client:
             r = await client.post(N8N_WEBHOOK_URL, json=payload)
             if r.status_code == 200:
                 logger.info(f"[n8n] Notificación enviada OK: {telefono}")
@@ -129,8 +129,8 @@ app = FastAPI(
 )
 
 
-@app.get("/")
-@app.get("/health")
+@app.api_route("/", methods=["GET", "HEAD"])
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     return {"status": "ok"}
 
