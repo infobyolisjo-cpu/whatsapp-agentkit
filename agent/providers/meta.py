@@ -19,6 +19,7 @@ class ProveedorMeta(ProveedorWhatsApp):
         self.phone_number_id = os.getenv("META_PHONE_NUMBER_ID")
         self.verify_token = os.getenv("META_VERIFY_TOKEN", "byolisjo-meta-2026")
         self.api_version = "v21.0"
+        self._client = httpx.AsyncClient(timeout=10.0)
 
     async def validar_webhook(self, request: Request) -> int | None:
         """Meta requiere verificación GET con hub.verify_token."""
@@ -63,8 +64,7 @@ class ProveedorMeta(ProveedorWhatsApp):
             "type": "text",
             "text": {"body": mensaje},
         }
-        async with httpx.AsyncClient() as client:
-            r = await client.post(url, json=payload, headers=headers)
-            if r.status_code != 200:
-                logger.error(f"Error Meta API: {r.status_code} — {r.text}")
-            return r.status_code == 200
+        r = await self._client.post(url, json=payload, headers=headers)
+        if r.status_code != 200:
+            logger.error(f"Error Meta API: {r.status_code} — {r.text}")
+        return r.status_code == 200

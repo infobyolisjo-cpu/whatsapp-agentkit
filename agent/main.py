@@ -42,6 +42,18 @@ N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
 _mensajes_procesados: dict[str, float] = {}
 MAX_CACHE = 500
 
+# Set de referencia fuerte para tasks en background
+# Evita que el GC cancele tareas antes de que terminen
+_background_tasks: set = set()
+
+
+def _crear_task(coro) -> asyncio.Task:
+    """Crea una task y guarda referencia fuerte hasta que termina."""
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
 
 def ya_procesado(mensaje_id: str) -> bool:
     """Retorna True si este mensaje ya fue procesado."""
@@ -141,7 +153,7 @@ async def webhook_verificacion(request: Request):
     hub_verify_token = request.query_params.get("hub.verify_token")
     hub_challenge = request.query_params.get("hub.challenge")
 
-    verify_token = os.getenv("VERIFY_TOKEN")
+    verify_token = os.getenv("META_VERIFY_TOKEN")
 
     if hub_mode == "subscribe" and hub_verify_token == verify_token:
         return PlainTextResponse(content=str(hub_challenge))
@@ -155,14 +167,14 @@ async def procesar_mensaje(telefono: str, texto: str, mensaje_id: str) -> None:
         historial = await obtener_historial(telefono)
 
         if not historial:
-            asyncio.create_task(notificar_crm(telefono, texto))
+            _crear_task(notificar_crm(telefono, texto))
 
         respuesta = await generar_respuesta(texto, historial, telefono=telefono)
 
         await guardar_mensaje(telefono, "user", texto)
         await guardar_mensaje(telefono, "assistant", respuesta)
 
-        asyncio.create_task(notificar_n8n(telefono, texto))
+        _crear_task(notificar_n8n(telefono, texto))
 
         await proveedor.enviar_mensaje(telefono, respuesta)
         logger.info(f"Respuesta enviada a {telefono}: {respuesta[:80]}")
@@ -193,7 +205,7 @@ async def webhook_handler(request: Request):
             logger.info(f"Mensaje de {msg.telefono}: {msg.texto}")
 
             # Procesar en background — Meta recibe 200 de inmediato
-            asyncio.create_task(procesar_mensaje(msg.telefono, msg.texto, msg.mensaje_id))
+            _crear_task(procesar_mensaje(msg.telefono, msg.texto, msg.mensaje_id))
 
         return {"status": "ok"}
 
@@ -202,10 +214,33 @@ async def webhook_handler(request: Request):
         return {"status": "ok"}  # Siempre 200 para que Meta no reintente
 
 from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import Depends
 import sqlite3
+import secrets
+from html import escape as _html_escape
+
+_http_security = HTTPBasic()
+
+
+def _verificar_inbox(credentials: HTTPBasicCredentials = Depends(_http_security)):
+    inbox_password = os.getenv("INBOX_PASSWORD", "")
+    if not inbox_password:
+        raise HTTPException(status_code=503, detail="INBOX_PASSWORD no configurado")
+    correcto = secrets.compare_digest(
+        credentials.password.encode("utf-8"),
+        inbox_password.encode("utf-8"),
+    )
+    if not correcto:
+        raise HTTPException(
+            status_code=401,
+            detail="Credenciales inválidas",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
 
 @app.get("/inbox", response_class=HTMLResponse)
-async def ver_inbox():
+async def ver_inbox(credentials: HTTPBasicCredentials = Depends(_verificar_inbox)):
     html = """
     <html>
     <head>
@@ -265,9 +300,9 @@ async def ver_inbox():
 
                 html += f"""
                 <tr>
-                    <td>{telefono}</td>
+                    <td>{_html_escape(telefono)}</td>
                     <td>{tipo}</td>
-                    <td class="{clase}">{content}</td>
+                    <td class="{clase}">{_html_escape(content)}</td>
                 </tr>
                 """
 

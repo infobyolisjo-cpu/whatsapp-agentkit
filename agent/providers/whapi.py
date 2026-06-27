@@ -16,6 +16,7 @@ class ProveedorWhapi(ProveedorWhatsApp):
     def __init__(self):
         self.token = os.getenv("WHAPI_TOKEN")
         self.url_envio = "https://gate.whapi.cloud/messages/text"
+        self._client = httpx.AsyncClient(timeout=10.0)
 
     async def parsear_webhook(self, request: Request) -> list[MensajeEntrante]:
         """Parsea el payload de Whapi.cloud."""
@@ -39,12 +40,11 @@ class ProveedorWhapi(ProveedorWhatsApp):
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         }
-        async with httpx.AsyncClient() as client:
-            r = await client.post(
-                self.url_envio,
-                json={"to": telefono, "body": mensaje},
-                headers=headers,
-            )
-            if r.status_code != 200:
-                logger.error(f"Error Whapi: {r.status_code} — {r.text}")
-            return r.status_code == 200
+        r = await self._client.post(
+            self.url_envio,
+            json={"to": telefono, "body": mensaje},
+            headers=headers,
+        )
+        if r.status_code != 200:
+            logger.error(f"Error Whapi: {r.status_code} — {r.text}")
+        return r.status_code == 200
