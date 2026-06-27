@@ -23,11 +23,21 @@ client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 RAG_WEBHOOK_URL = os.getenv("RAG_WEBHOOK_URL", "")
 
 
+_prompts_cache: dict = {}
+_prompts_mtime: float = 0.0
+
+
 def cargar_config_prompts() -> dict:
-    """Lee toda la configuración desde config/prompts.yaml."""
+    """Lee toda la configuración desde config/prompts.yaml (con cache por mtime)."""
+    global _prompts_cache, _prompts_mtime
     try:
-        with open("config/prompts.yaml", "r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+        mtime = os.path.getmtime("config/prompts.yaml")
+        if mtime != _prompts_mtime:
+            with open("config/prompts.yaml", "r", encoding="utf-8") as f:
+                _prompts_cache = yaml.safe_load(f) or {}
+            _prompts_mtime = mtime
+            logger.debug("config/prompts.yaml recargado desde disco")
+        return _prompts_cache
     except FileNotFoundError:
         logger.error("config/prompts.yaml no encontrado")
         return {}
@@ -161,7 +171,7 @@ async def generar_respuesta(mensaje: str, historial: list[dict], telefono: str =
         response = await client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1024,
-            system=system_prompt,
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             messages=mensajes
         )
 
